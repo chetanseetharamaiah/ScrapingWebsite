@@ -389,6 +389,7 @@ class RedBus_Scrape:
         def change_time_format(df):
             df['bdtime'] = df['bdtime'].apply(lambda x: str(x).split(" ")[-1])
             df['dptime'] = df['dptime'].apply(lambda x: str(x).split(" ")[-1])
+            df['busid'] = df['busid'].astype(str)
             return df
         def time_selection(prefix):
             time_options1 = [f"{h:02d}" for h in range(24)]
