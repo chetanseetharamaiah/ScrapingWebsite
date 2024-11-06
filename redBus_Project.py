@@ -24,12 +24,14 @@ class RedBus_Scrape:
         self.buslink_l = []
         self.Bus_Route_Link = {} #holds all the states and link to open the state link
         self.bus_full_list = []
+        self.dbname = "redBus"
+        self.file_name = "redBus"
         
     def fetch_the_website_info(self):
         self.driver = webdriver.Chrome()
         print("test start and the time is ",datetime.now())
         self.driver.get(self.url)
-        time.sleep(6)
+        time.sleep(4)
         self.driver.maximize_window()
         st.write("Opening redBus Website")
         self.get_states_info()
@@ -62,9 +64,11 @@ class RedBus_Scrape:
         try:
             for bus,link in self.Bus_Route_Link.items():
                 state_name_str = "_".join(re.findall(r'\b[A-Z]+\b', bus))
-                st.write(f"state {state_name_str} link is {link}")
+                st.write(f"STATE &nbsp;&nbsp;&nbsp;&nbsp;{state_name_str}")
+                st.write(f"{link}")
+                time.sleep(1)
                 self.driver.execute_script(f"window.open('{link}');")
-                time.sleep(5)
+                time.sleep(3)
                 self.driver.switch_to.window(self.driver.window_handles[-1])  # Switch to the latest tab
                 # fetching the number of buse routes in each page and the number of pages in the particular state and add them into a list for later use
                 try:
@@ -80,34 +84,30 @@ class RedBus_Scrape:
                     self.driver.switch_to.window(self.original_window)
                 else:
                     st.write(f"{state_name_str} This link has no data")
-                
             print("test end and the time is ",datetime.now())
         except Exception as e:
             print("error in open_state")
             print("Error:", e)
-        
-
+       
     def scrape_route_infos(self,page_numbers,state_name_str,state_link):
         try:
             for i in range(len(page_numbers)):
                 self.driver.execute_script("arguments[0].scrollIntoView();", page_numbers[i])
-                time.sleep(2)
-                WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable(page_numbers[i])).click()
+                time.sleep(1)
+                WebDriverWait(self.driver, 5).until(EC.element_to_be_clickable(page_numbers[i])).click()
                 self.driver.execute_script("window.scrollTo(0, 0);")
-                time.sleep(2)
+                time.sleep(1)
                 self.bus_link()
-            self.get_bus_details(self.busname_l,self.buslink_l,state_name_str,state_link)
+            self.get_bus_details(state_name_str,state_link)
             self.busname_l.clear()
             self.buslink_l.clear()
         except Exception as e:
             print("error at scrape_route_infos")
             print(f"Error at {e}")
-        
-
+    
     def copy_to_csv_file(self,bus_full_list):
-
         try:
-            csv_file_name = self.create_csv_file('redBus')
+            csv_file_name = self.create_csv_file(f'{self.file_name}')
             with open(csv_file_name, mode='a', newline='', encoding='utf-8') as file:
                 writer = csv.writer(file)
                 for busdetail in bus_full_list:
@@ -134,42 +134,43 @@ class RedBus_Scrape:
         except Exception as e:
             print("Error why writting the bus full details to csv")
             print(f"Error code is {e}")
-        
-    
     def bus_link(self):
         #fetching every route name and corresponding link for the route of particular state
         try:
-            time.sleep(5)
+            time.sleep(2)
             routes = self.driver.find_elements(By.CSS_SELECTOR, 'div.route_details a.route')
             for route in routes:
                 link = route.get_attribute('href')
                 name = route.get_attribute('title')
                 self.busname_l.append(name)
                 self.buslink_l.append(link)
-            
         except Exception as e:
             print("error at bus link")
             print(f"Error occurred: {e}")
 
-    def get_bus_details(self,busname_l,buslink_l,state_name_str,state_link):
+    def get_bus_details(self,state_name_str,state_link):
         try:
-            for i in range(len(buslink_l)):
-                st.write(f"route {busname_l[i]}--->  {buslink_l[i]}")
-                self.driver.get(buslink_l[i])
-                time.sleep(6)
+            for i in range(len(self.buslink_l)):
+                st.write(f"&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ROUTE {self.busname_l[i]}--->  {self.buslink_l[i]}")
+                self.driver.get(self.buslink_l[i])
+                time.sleep(2)
                 check_for_gvt_bus = self.driver.find_elements(By.CSS_SELECTOR, "div.group-data.clearfix")
                 check_for_pvt_bus = self.driver.find_elements(By.CSS_SELECTOR, 'ul.bus-items')
-                
+                st.write("&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Fetching government and private bus details")
                 if check_for_gvt_bus:
-                    time.sleep(3)
-                    bus_details_gvt = self.get_gvt_bus_details(check_for_gvt_bus,state_name_str,busname_l[i],buslink_l[i])
+                    
+                    bus_details_gvt = self.get_gvt_bus_details(check_for_gvt_bus,state_name_str,self.busname_l[i],self.buslink_l[i])
                     self.bus_full_list.append(bus_details_gvt)
-                    time.sleep(5)
+                    time.sleep(2)
                 if check_for_pvt_bus:
-                    bus_details_pvt = self.get_pvt_bus_details_in_route(state_name_str,busname_l[i],buslink_l[i])
+                    bus_details_pvt = self.get_pvt_bus_details_in_route(state_name_str,self.busname_l[i],self.buslink_l[i])
                     self.bus_full_list.append(bus_details_pvt)
+                    time.sleep(2)
                 else:
-                    st.write(f"{busname_l[i]} doesnt have any data")
+                    st.write(f"&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{self.busname_l[i]} doesnt have any data")
+                st.write("&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Successfully scraped  bus details")
+            st.write(f"Successfully scraped the {state_name_str} state")
+            
         except Exception as e:
             print("error at get_bus_details")
             print(f"error is {e}")
@@ -187,10 +188,8 @@ class RedBus_Scrape:
             print("Error:", e)
 
     def get_gvt_bus_details(self,r_route_details,state_name,bus_route,route_link):
-        st.write("fetching gvt bus details")
         try:
-            time.sleep(3)
-            i = 0
+            time.sleep(1)
             for r1_route_elements in  r_route_details:                       
                 r1_route_elements = WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, "div.gmeta-data.clearfix")))
                 r2_route_bus_check = r1_route_elements.find_element(By.CLASS_NAME, "button")
@@ -198,48 +197,45 @@ class RedBus_Scrape:
                     r2_route_bus_check.click()
                 except Exception as e:
                     print(f"error is {e}")
-                time.sleep(3)
-                bus_list = WebDriverWait(self.driver, 20).until(EC.presence_of_element_located((By.CSS_SELECTOR, 'ul.bus-items')))
+                time.sleep(1)
+                bus_list = WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, 'ul.bus-items')))
                 last_height = self.driver.execute_script("return document.body.scrollHeight")
                 while True:
                     self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-                    time.sleep(3)  # Wait for the content to load
+                    time.sleep(1)  # Wait for the content to load
                     new_height = self.driver.execute_script("return document.body.scrollHeight")
                     if new_height == last_height:
                         break  # Break if no new content is loaded
                     last_height = new_height
-                bus_items = WebDriverWait(bus_list, 20).until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, "li.row-sec")))
-                time.sleep(2)
+                bus_items = WebDriverWait(bus_list, 10).until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, "li.row-sec")))
+                time.sleep(1)
                 self.driver.execute_script("document.body.scrollIntoView({behavior: 'smooth', block: 'start'});")
                 bus_gvt_list = self.fetch_bus_information(bus_items,state_name,bus_route,route_link,operator='Government')
                 self.driver.execute_script("document.body.scrollIntoView({behavior: 'smooth', block: 'start'});")
-                time.sleep(2)
+                time.sleep(1)
                 r2_route_bus_check.click()
-                i = i+1
-            st.write("Successfully scraped government bus details")
-           
+                            
         except Exception as e:
             print("Error are gvt bus details")
             print(f"Error occurred: {e}")
         return bus_gvt_list
     def get_pvt_bus_details_in_route(self,state_name,bus_route,route_link):
-        st.write("Fetching Private Bus Details")
         try:
             bus_list = self.driver.find_element(By.CSS_SELECTOR, 'ul.bus-items')
-            WebDriverWait(self.driver, 30).until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, "ul.bus-items")))
+            WebDriverWait(self.driver, 10).until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, "ul.bus-items")))
             last_height = self.driver.execute_script("return document.body.scrollHeight")
             while True:
                 self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-                time.sleep(3)  # Wait for the content to load
+                time.sleep(1)  # Wait for the content to load
                 new_height = self.driver.execute_script("return document.body.scrollHeight")
                 if new_height == last_height:
                     break  # Break if no new content is loaded
                 last_height = new_height
-            bus_items = WebDriverWait(self.driver, 20).until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, "li.row-sec")))
-            time.sleep(2)
+            bus_items = WebDriverWait(self.driver, 10).until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, "li.row-sec")))
+            time.sleep(1)
             bus_pvt_list = self.fetch_bus_information(bus_items,state_name,bus_route,route_link,operator='Private')
             self.driver.execute_script("document.body.scrollIntoView({behavior: 'smooth', block: 'start'});")
-            st.write("Successfully scraped private bus details")
+            
         except Exception as e:
             print("error at get_pvt_bus_details_in_route")
             print(f"Error occurred: {e}")
@@ -298,8 +294,6 @@ class RedBus_Scrape:
                 print(f"Error occurred: {e}")
         return fetched_bus_info
 
-    
-      
     def create_db_add_bus_info(self):
         print("db test start and the time is ",datetime.now())
         st.markdown(
@@ -324,17 +318,14 @@ class RedBus_Scrape:
             cursor = con.cursor()
             time.sleep(3)
             
-            query = "drop database if exists redbus"
-            cursor.execute(query)
-            time.sleep(5)
-            query = "create database redbus"  #-> to create   keep this
+            query = f"create database if not exists {self.dbname}"  #-> to create   keep this
             cursor.execute(query) # -> keep this
             time.sleep(3)
             
-            query = "use redbus"
+            query = f"use {self.dbname}"
             cursor.execute(query)
             
-            query = """create table businfo( id int AUTO_INCREMENT PRIMARY KEY,
+            query = """create table if not exists businfo( id int AUTO_INCREMENT PRIMARY KEY,
                                             state text,
                                             routes text,
                                             routelink text,
@@ -357,10 +348,10 @@ class RedBus_Scrape:
                     print(f"Error: {e}")
             time.sleep(2)
             #con.close()
-            engine = create_engine('mysql+pymysql://root:123456789@localhost:3306/redbus')
+            engine = create_engine(f'mysql+pymysql://root:123456789@localhost:3306/{self.dbname}')
             
             current_directory = os.getcwd()
-            csv_files = glob.glob(os.path.join(current_directory, "*.csv"))
+            csv_files = glob.glob(os.path.join(current_directory, f"{self.dbname}.csv"))
             if csv_files:
                 for file in csv_files:
                     filename = os.path.basename(file)
@@ -375,7 +366,6 @@ class RedBus_Scrape:
                 st.success('successfully created table and copied the data into table!')
             else:
                 st.write("Sorry am unable to find the files to ")
-        
         print("db test end and the time is ",datetime.now())
         
     def fetch_the_deatils_from_DB(self):
@@ -384,7 +374,7 @@ class RedBus_Scrape:
         host='localhost',
         user='root',
         password='123456789',
-        database='redbus'
+        database=f'{self.dbname}'
         )
         def change_time_format(df):
             df['bdtime'] = df['bdtime'].apply(lambda x: str(x).split(" ")[-1])
@@ -405,7 +395,7 @@ class RedBus_Scrape:
             selected_time = f"{selected_hour}:{selected_minute}:{selected_second}"
             return selected_time
         
-        query = f"SELECT * FROM redbus.businfo"
+        query = f"SELECT * FROM {self.dbname}.businfo"
         df = pd.read_sql(query, connection)
         df = change_time_format(df)  
         state = df['state'].drop_duplicates().tolist()
@@ -413,13 +403,13 @@ class RedBus_Scrape:
         sta = st.selectbox('states',state)
         if sta != 'Select your option':
             query = f""" SELECT * 
-                                FROM redbus.businfo 
+                                FROM {self.dbname}.businfo 
                                 WHERE state = '{sta}'
                     """
             df = pd.read_sql(query, connection)
-            rou = df['routes'].drop_duplicates().tolist()
-            rou.insert(0, 'Select your option')
-            rt = st.selectbox('routes', rou)
+            route = df['routes'].drop_duplicates().tolist()
+            route.insert(0, 'Select your option')
+            rt = st.selectbox('routes', route)
             if rt != 'Select your option':
                 op = df['operator'].drop_duplicates().tolist()
                 op.insert(0,'Select your option')
@@ -443,7 +433,7 @@ class RedBus_Scrape:
                                         st.write(f"boarding time")
                                         bdtime = time_selection(prefix = "bdtime")
                                         query = f""" SELECT *
-                                        FROM redbus.businfo
+                                        FROM {self.dbname}.businfo
                                         WHERE state = '{sta}'and routes = '{rt}' and operator = '{opt}' and bustype = '{bus_type}' and rating > '{rating}' and fare <= '{fare}' and avilableseats >= '{avilableseat}' and windowseats >= '{windowseat}' and dptime >= '{dptime}' and bdtime <= '{bdtime}'
                                         """
                                         df = pd.read_sql(query, connection)
@@ -452,7 +442,7 @@ class RedBus_Scrape:
                                         
                                     else:
                                         query = f""" SELECT *
-                                        FROM redbus.businfo
+                                        FROM {self.dbname}.businfo
                                         WHERE state = '{sta}'and routes = '{rt}' and operator = '{opt}' and bustype = '{bus_type}' and rating > '{rating}' and fare <= '{fare}' and avilableseats >= '{avilableseat}'
                                         """
                                         df = pd.read_sql(query, connection)
@@ -460,7 +450,7 @@ class RedBus_Scrape:
                                         st.dataframe(df)
                                 else:
                                     query = f""" SELECT *
-                                        FROM redbus.businfo
+                                        FROM {self.dbname}.businfo
                                         WHERE state = '{sta}'and routes = '{rt}' and operator = '{opt}' and bustype = '{bus_type}' and rating > '{rating}' and fare <= '{fare}' 
                                         """
                                     df = pd.read_sql(query, connection)
@@ -468,7 +458,7 @@ class RedBus_Scrape:
                                     st.dataframe(df)
                             else:
                                 query = f""" SELECT *
-                                        FROM redbus.businfo
+                                        FROM {self.dbname}.businfo
                                         WHERE state = '{sta}'and routes = '{rt}' and operator = '{opt}' and bustype = '{bus_type}'  and rating >= '{rating}' 
                                     """
                                 df = pd.read_sql(query, connection)
@@ -476,7 +466,7 @@ class RedBus_Scrape:
                                 st.dataframe(df)
                         else:
                             query = f""" SELECT *
-                                        FROM redbus.businfo
+                                        FROM {self.dbname}.businfo
                                         WHERE state = '{sta}'and routes = '{rt}' and operator = '{opt}' and bustype = '{bus_type}'
                                     """
                             df = pd.read_sql(query, connection)
@@ -484,7 +474,7 @@ class RedBus_Scrape:
                             st.dataframe(df)
                     else:
                         query = f""" SELECT * 
-                                    FROM redbus.businfo 
+                                    FROM {self.dbname}.businfo 
                                     WHERE state = '{sta}' and routes = '{rt}' and operator = '{opt}'  
                                     """
                         df = pd.read_sql(query, connection)
@@ -492,7 +482,7 @@ class RedBus_Scrape:
                         st.dataframe(df)
                 else:
                     query = f""" SELECT * 
-                                    FROM redbus.businfo 
+                                    FROM {self.dbname}.businfo 
                                     WHERE state = '{sta}' and routes = '{rt}'  
                                     """
                     df = pd.read_sql(query, connection)
@@ -500,7 +490,7 @@ class RedBus_Scrape:
                     st.dataframe(df)
             else:
                 query = f""" SELECT * 
-                                FROM redbus.businfo 
+                                FROM {self.dbname}.businfo 
                                 WHERE state = '{sta}' """
                 df = pd.read_sql(query, connection)
                 df = change_time_format(df)
@@ -556,4 +546,3 @@ elif st.session_state.page == 'copy_csv_values_to_mysql':
     project.create_db_add_bus_info()
 elif st.session_state.page == 'fetch_db_from_mysql':
     project.fetch_the_deatils_from_DB()
-
